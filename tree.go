@@ -26,20 +26,11 @@ var (
 type node struct {
 	// parent *node
 	key        string
-	indices    [256]uint8
-	children   []*node
+	children   map[byte]*node
 	value      HandlerFunc
 	wildChild  bool
 	isParam    bool
 	isCatchAll bool
-}
-
-const indexNotSet = 255
-
-func initIndices(idcs *[256]uint8) {
-	for i := range idcs {
-		idcs[i] = indexNotSet
-	}
 }
 
 // addRoute adds a leaf with the given value to the path determined by the given
@@ -58,15 +49,14 @@ func (n *node) addRoute(key string, value HandlerFunc) error {
 
 			// Split edge
 			if i < len(n.key) {
-				n.children = []*node{&node{
-					key:       n.key[i:],
-					indices:   n.indices,
-					children:  n.children,
-					value:     n.value,
-					wildChild: n.wildChild,
-				}}
-				initIndices(&n.indices)
-				n.indices[n.key[i]] = 0
+				n.children = map[byte]*node{
+					n.key[i]: &node{
+						key:       n.key[i:],
+						children:  n.children,
+						value:     n.value,
+						wildChild: n.wildChild,
+					},
+				}
 				n.key = key[:i]
 				n.value = nil
 				n.wildChild = false
@@ -95,21 +85,22 @@ func (n *node) addRoute(key string, value HandlerFunc) error {
 
 				// TODO: remove / edit for variable delimiter
 				if n.isParam && c == '/' && len(n.children) == 1 {
-					n = n.children[0]
+					n = n.children[c]
 					continue
 				}
 
 				// Check if a child with the next key byte exists
-				if i := n.indices[c]; i != indexNotSet {
-					n = n.children[i]
+				if child := n.children[c]; child != nil {
+					n = child
 					continue
 				}
 
 				if c != ':' && c != '*' {
 					child := &node{}
-					initIndices(&child.indices)
-					n.indices[c] = uint8(len(n.children))
-					n.children = append(n.children, child)
+					if n.children == nil {
+						n.children = make(map[byte]*node)
+					}
+					n.children[c] = child
 					n = child
 				}
 				return n.insertRoute(key, value)
@@ -155,7 +146,6 @@ func (n *node) insertRoute(key string, value HandlerFunc) error {
 
 			// split path at the beginning of the wildcard
 			child := &node{}
-			initIndices(&child.indices)
 			if b == ':' {
 				child.isParam = true
 			} else {
@@ -167,7 +157,10 @@ func (n *node) insertRoute(key string, value HandlerFunc) error {
 				offset = i
 			}
 
-			n.children = []*node{child}
+			if n.children == nil {
+				n.children = make(map[byte]*node)
+			}
+			n.children[0] = child
 			n.wildChild = true
 			n = child
 
@@ -178,8 +171,10 @@ func (n *node) insertRoute(key string, value HandlerFunc) error {
 				offset = k
 
 				child := &node{}
-				initIndices(&child.indices)
-				n.children = []*node{child}
+				if n.children == nil {
+					n.children = make(map[byte]*node)
+				}
+				n.children[key[k]] = child
 				n = child
 			}
 		}
@@ -210,8 +205,8 @@ func (n *node) getValue(key string) (value HandlerFunc, vars map[string]string, 
 
 			// No handler found. Check if a handler for this path + a
 			// trailing slash exists for TSR recommendation
-			if i := n.indices['/']; i != indexNotSet {
-				n = n.children[i]
+			if child := n.children['/']; child != nil {
+				n = child
 				tsr = (n.key == "/" && n.value != nil)
 				return
 			}
@@ -243,7 +238,7 @@ func (n *node) getValue(key string) (value HandlerFunc, vars map[string]string, 
 				if k < l {
 					if len(n.children) > 0 {
 						key = key[k:]
-						n = n.children[0]
+						n = n.children[key[0]]
 						continue
 					} else { // ... but we can't
 						tsr = (l == k+1)
@@ -256,7 +251,7 @@ func (n *node) getValue(key string) (value HandlerFunc, vars map[string]string, 
 				} else if len(n.children) == 1 {
 					// No handler found. Check if a handler for this path + a
 					// trailing slash exists for TSR recommendation
-					n = n.children[0]
+					n = n.children['/']
 					tsr = (n.key == "/" && n.value != nil)
 				}
 				return
@@ -276,8 +271,8 @@ func (n *node) getValue(key string) (value HandlerFunc, vars map[string]string, 
 			}
 
 		} else {
-			if i := n.indices[key[0]]; i != indexNotSet {
-				n = n.children[i]
+			if child := n.children[key[0]]; child != nil {
+				n = child
 				continue
 			}
 

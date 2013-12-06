@@ -63,7 +63,6 @@ func New() *Router {
 		RedirectTrailingSlash: true,
 		NotFound:              NotFound,
 	}
-	initIndices(&r.indices)
 	return r
 }
 
