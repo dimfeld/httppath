@@ -26,12 +26,20 @@ var (
 type node struct {
 	// parent *node
 	key        string
-	indices    []byte
+	indices    [256]uint8
 	children   []*node
 	value      HandlerFunc
 	wildChild  bool
 	isParam    bool
 	isCatchAll bool
+}
+
+const indexNotSet = 255
+
+func initIndices(idcs *[256]uint8) {
+	for i := range idcs {
+		idcs[i] = indexNotSet
+	}
 }
 
 // addRoute adds a leaf with the given value to the path determined by the given
@@ -40,7 +48,6 @@ type node struct {
 func (n *node) addRoute(key string, value HandlerFunc) error {
 	// non-empty tree
 	if len(n.key) != 0 {
-	OUTER:
 		for {
 			// find longest common prefix
 			// this also implies that the commom prefix contains no ':' or '*'
@@ -58,7 +65,8 @@ func (n *node) addRoute(key string, value HandlerFunc) error {
 					value:     n.value,
 					wildChild: n.wildChild,
 				}}
-				n.indices = []byte{n.key[i]}
+				initIndices(&n.indices)
+				n.indices[n.key[i]] = 0
 				n.key = key[:i]
 				n.value = nil
 				n.wildChild = false
@@ -77,7 +85,7 @@ func (n *node) addRoute(key string, value HandlerFunc) error {
 						if len(n.key) < len(key) && key[len(n.key)] != '/' {
 							return ErrWildCardConflict
 						}
-						continue OUTER
+						continue
 					} else {
 						return ErrWildCardConflict
 					}
@@ -88,22 +96,20 @@ func (n *node) addRoute(key string, value HandlerFunc) error {
 				// TODO: remove / edit for variable delimiter
 				if n.isParam && c == '/' && len(n.children) == 1 {
 					n = n.children[0]
-					continue OUTER
+					continue
 				}
 
 				// Check if a child with the next key byte exists
-				for i, index := range n.indices {
-					if c == index {
-						n = n.children[i]
-						continue OUTER
-					}
+				if i := n.indices[c]; i != indexNotSet {
+					n = n.children[i]
+					continue
 				}
 
 				if c != ':' && c != '*' {
-					n.indices = append(n.indices, c)
 					child := &node{}
+					initIndices(&child.indices)
+					n.indices[c] = uint8(len(n.children))
 					n.children = append(n.children, child)
-
 					n = child
 				}
 				return n.insertRoute(key, value)
@@ -149,6 +155,7 @@ func (n *node) insertRoute(key string, value HandlerFunc) error {
 
 			// split path at the beginning of the wildcard
 			child := &node{}
+			initIndices(&child.indices)
 			if b == ':' {
 				child.isParam = true
 			} else {
@@ -171,6 +178,7 @@ func (n *node) insertRoute(key string, value HandlerFunc) error {
 				offset = k
 
 				child := &node{}
+				initIndices(&child.indices)
 				n.children = []*node{child}
 				n = child
 			}
@@ -191,7 +199,6 @@ func (n *node) insertRoute(key string, value HandlerFunc) error {
 // given path.
 func (n *node) getValue(key string) (value HandlerFunc, vars map[string]string, tsr bool) {
 	// Walk tree nodes
-OUTER:
 	for len(key) >= len(n.key) && key[:len(n.key)] == n.key {
 		key = key[len(n.key):]
 
@@ -203,12 +210,10 @@ OUTER:
 
 			// No handler found. Check if a handler for this path + a
 			// trailing slash exists for TSR recommendation
-			for i, index := range n.indices {
-				if index == '/' {
-					n = n.children[i]
-					tsr = (n.key == "/" && n.value != nil)
-					return
-				}
+			if i := n.indices['/']; i != indexNotSet {
+				n = n.children[i]
+				tsr = (n.key == "/" && n.value != nil)
+				return
 			}
 			return
 
@@ -271,13 +276,9 @@ OUTER:
 			}
 
 		} else {
-			c := key[0]
-
-			for i, index := range n.indices {
-				if c == index {
-					n = n.children[i]
-					continue OUTER
-				}
+			if i := n.indices[key[0]]; i != indexNotSet {
+				n = n.children[i]
+				continue
 			}
 
 			// Nothing found. We can recommend to redirect to the same URL without

@@ -59,10 +59,12 @@ var _ http.Handler = New()
 // The router can be configured to also match the requested HTTP method or the
 // requested Host.
 func New() *Router {
-	return &Router{
+	r := &Router{
 		RedirectTrailingSlash: true,
 		NotFound:              NotFound,
 	}
+	initIndices(&r.indices)
+	return r
 }
 
 // Add registers a new request handler to the given path.

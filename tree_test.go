@@ -62,6 +62,7 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {
 
 func TestTreeAddAndGet(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]string{
 		"/hi",
@@ -97,6 +98,7 @@ func TestTreeAddAndGet(t *testing.T) {
 
 func TestTreeWildcard(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]string{
 		"/",
@@ -136,6 +138,7 @@ func TestTreeWildcard(t *testing.T) {
 
 func TestTreeWildcardConflict(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]struct {
 		path     string
@@ -171,6 +174,7 @@ func TestTreeWildcardConflict(t *testing.T) {
 
 func TestTreeChildConflict(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]struct {
 		path     string
@@ -205,6 +209,7 @@ func TestTreeChildConflict(t *testing.T) {
 
 func TestTreeDupliatePath(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]string{
 		"/",
@@ -242,6 +247,7 @@ func TestTreeDupliatePath(t *testing.T) {
 
 func TestEmptyWildcardName(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]string{
 		"/user:",
@@ -258,6 +264,7 @@ func TestEmptyWildcardName(t *testing.T) {
 
 func TestTreeCatchAllConflict(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]struct {
 		path     string
@@ -282,6 +289,7 @@ func TestTreeCatchAllConflict(t *testing.T) {
 
 /*func TestTreeDuplicateWildcard(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]string{
 		"/:id/:name/:id",
@@ -293,6 +301,7 @@ func TestTreeCatchAllConflict(t *testing.T) {
 
 func TestTreeTrailingSlashRedirect(t *testing.T) {
 	tree := &node{}
+	initIndices(&tree.indices)
 
 	routes := [...]string{
 		"/hi",
