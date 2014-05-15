@@ -5,7 +5,7 @@
 
 package httprouter
 
-// CleanPath is the URL version of path.Clean, it returns a canonical URL path
+// Clean is the URL version of path.Clean, it returns a canonical URL path
 // for p, eliminating . and .. elements.
 //
 // The following rules are applied iteratively until no further processing can
@@ -18,7 +18,7 @@ package httprouter
 //	   that is, replace "/.." by "/" at the beginning of a path.
 //
 // If the result of this process is an empty string, "/" is returned
-func CleanPath(p string) string {
+func Clean(p string) string {
 	if p == "" {
 		return "/"
 	}
